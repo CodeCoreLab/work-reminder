@@ -1,18 +1,22 @@
 # 发布记录
 
+> 本文记录发布方式与历次发布情况。**服务器地址、目录路径与内网域名已脱敏**，
+> 仅保留方法、踩坑记录与验收口径。
+
+---
+
 ## 2026-10-22 首次上线
 
 | 项 | 值 |
 |---|---|
-| URL | https://example-site.com/work-reminder/ |
-| 目标机 | example-test-host（**不是**跳板机 example-jump-host） |
-| 目录 | `/opt/xmtooldev/www/work-reminder/`（index.html 55.7 KB + assets 252 KB） |
+| URL | `<站点根>/<slug>/` |
+| 目录 | `<站点根>/<slug>/`（index.html 55.7 KB + assets 252 KB） |
 | 安装包 | `assets/work-reminder-v1.0.0.zip` · 257,904 字节 · zip 头 `PK` |
-| 属主权限 | `root:root`，目录 755 / 文件 644 |
-| 入口卡片 | 已插入 `/opt/xmtooldev/www/index.html`，`grep -c 'href="/work-reminder/"'` = 1 |
-| 入口页备份 | `www/index.html.bak_cards_20261022_1939`（md5 `17b4e4f2…`，与原件一致） |
+| 属主权限 | 目录 755 / 文件 644 |
+| 入口卡片 | 已插入站点入口页，`grep -c 'href="/<slug>/"'` = 1 |
+| 入口页备份 | `index.html.bak_<时间戳>`（md5 与原件一致） |
 | healthcheck | exit 0，含 `tool:work-reminder -> 200` |
-| 解耦红线 | vhost `grep -c aireport` = 0；页面 `grep -c aireport` = 0 |
+| 解耦红线 | vhost 与页面内容中不含其他站点的标识 |
 | 回滚点 | 首次发布，无旧快照；回滚即 `deploy.sh work-reminder --rollback`（无旧版时不适用） |
 
 ### 验收（真浏览器，非服务端 curl）
@@ -42,6 +46,7 @@
 
 ### 注意
 
-- 覆盖 `site-pub/index.html` 会**丢掉** `prepare_publish_dir.py` 注入的「工具列表」返回链接。
+- 覆盖发布目录中的 `index.html` 会**丢掉**准备脚本注入的「工具列表」返回链接。
   改页面后必须重新跑准备脚本，不能直接复制。
-- vhost 配置实际路径是 `/opt/xmtooldev/conf/xmtooldev.conf`（不是 skill 文档里写的 `conf.d/`）。
+- vhost 配置的实际路径与准备脚本文档里写的不一致——发布前先核对真实路径，
+  不要照抄文档。
