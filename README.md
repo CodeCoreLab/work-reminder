@@ -1,5 +1,7 @@
 # work-reminder · 工作提醒助手（Tauri 2 版）
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-8a2be2.svg)](LICENSE)[![Releases](https://img.shields.io/badge/Releases-latest-blue.svg)](https://github.com/CodeCoreLab/work-reminder/releases)[![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D4.svg)]
+
 一个常驻系统托盘的轻量提醒工具，支持 **12 种提醒方式**，单文件 3.08 MB，零外部运行时依赖。
 
 > 本项目是对同名 Windows 工具的**净室重写**：只依据行为规格重新实现，未复制原程序的任何代码。

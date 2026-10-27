@@ -215,7 +215,7 @@ main.rs            1,013 行  —— 消息循环 + tick 编排
 ## 5. 复现方式
 
 ```bash
-export PATH="/c/Users/Administrator/.rustup/toolchains/stable-x86_64-pc-windows-gnu/lib/rustlib/x86_64-pc-windows-gnu/bin/self-contained:$PATH"
+export PATH="$HOME/.rustup/toolchains/stable-x86_64-pc-windows-gnu/lib/rustlib/x86_64-pc-windows-gnu/bin/self-contained:$PATH"
 
 cargo test --lib                          # 111 项
 cargo clippy --release                    # 3 条（预期）
