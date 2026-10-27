@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的提醒</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__title">
+    <h1>我的提醒</h1>
+    <p class="topbar__hint">关掉窗口也没关系，我会继续在系统托盘等着提醒你。</p>
+  </div>
+  <label class="switch" title="开机后自动启动并静默运行">
+    <input type="checkbox" id="autostart">
+    <span class="switch__track"><span class="switch__knob"></span></span>
+    <span class="switch__label">开机自动启动</span>
+  </label>
+</header>
+
+<main class="panel">
+  <!-- Empty state and table share the panel; only one is visible at a time. -->
+  <div class="empty" id="empty" hidden>
+    <div class="empty__mark" aria-hidden="true">
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="24" cy="24" r="18"/>
+        <path d="M24 14v11l7 4"/>
+      </svg>
+    </div>
+    <p class="empty__title">还没有提醒</p>
+    <p class="empty__hint">点下面的「新建提醒」，到点我来叫你。</p>
+  </div>
+
+  <div class="table" id="table" hidden>
+    <div class="table__head">
+      <span class="col col--check">启用</span>
+      <span class="col col--name">名称</span>
+      <span class="col col--sched">提醒计划</span>
+      <span class="col col--next">下次提醒</span>
+    </div>
+    <div class="table__body" id="rows"></div>
+  </div>
+</main>
+
+<footer class="actions">
+  <button class="btn btn--primary" id="new">＋　新建提醒</button>
+  <button class="btn" id="edit" disabled>编辑</button>
+  <button class="btn" id="toggle" disabled>启用 / 暂停</button>
+  <button class="btn btn--danger" id="delete" disabled>删除提醒</button>
+  <button class="btn" id="about">关于</button>
+  <button class="btn" id="close">关闭</button>
+</footer>
+
+<!-- New / edit dialog. A <dialog> gives focus trapping and Esc for free, which is
+     exactly the behaviour a modal needs and hand-rolled Win32 dialogs lack. -->
+<dialog class="sheet" id="sheet">
+  <form method="dialog" id="form">
+    <header class="sheet__head">
+      <h2 id="sheetTitle">设置提醒任务</h2>
+      <p class="sheet__hint">把要做的事情和时间告诉我，到点就来提醒你。</p>
+    </header>
+
+    <div class="field">
+      <label for="f-title">任务名称</label>
+      <input id="f-title" type="text" placeholder="例如：喝水" autocomplete="off" required>
+    </div>
+
+    <div class="field">
+      <label for="f-message">提醒内容</label>
+      <textarea id="f-message" rows="2" placeholder="例如：记得去接杯水，顺便起来活动一下。"></textarea>
+    </div>
+
+    <div class="field">
+      <label for="f-kind">提醒方式</label>
+      <select id="f-kind"></select>
+    </div>
+
+    <!-- Parameter rows are generated from the backend's own table, so the form can
+         never offer a field the parser does not read. -->
+    <div id="params"></div>
+
+    <label class="check">
+      <input type="checkbox" id="f-enabled" checked>
+      <span>启用此任务</span>
+    </label>
+
+    <p class="form-error" id="formError" hidden></p>
+
+    <footer class="sheet__actions">
+      <button type="button" class="btn" id="cancel">取消</button>
+      <button type="submit" class="btn btn--primary" id="save">保存</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Reminder card. Fixed top-right, stacks, auto-dismisses. -->
+<div class="stack" id="stack" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

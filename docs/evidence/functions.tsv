@@ -1,0 +1,200 @@
+start_rva	length	related_strings
+0x01040	51	
+0x01080	37	
+0x010b0	37	
+0x010e0	37	
+0x01110	37	
+0x01140	37	
+0x011c0	51	
+0x01200	51	
+0x01270	44	
+0x012c0	48	
+0x01350	32	
+0x01390	40	
+0x013c0	93	
+0x01430	51	
+0x014a0	51	
+0x014e0	51	
+0x01570	125	
+0x01640	13	
+0x0164d	51	
+0x01680	16	
+0x016c0	32	
+0x01850	599	
+0x01b20	46	
+0x01b50	46	
+0x01b80	46	
+0x01bb0	89	
+0x01c10	89	
+0x01d50	363	
+0x01ee0	276	
+0x02000	88	
+0x02060	88	
+0x020c0	88	
+0x02120	88	
+0x02180	88	
+0x021e0	55	
+0x02220	135	
+0x022b0	472	
+0x024c0	275	
+0x025e0	386	
+0x02770	81	
+0x027d0	46	
+0x02830	32	
+0x02850	102	
+0x028b6	5	
+0x02900	81	
+0x02960	113	
+0x029f0	227	
+0x02ae0	169	
+0x02b90	31	
+0x02bc0	292	about-dialog.png
+0x02cf0	305	date-time-picker.png
+0x02e30	95	
+0x02e90	78	
+0x02f40	63	
+0x02f80	136	
+0x03010	243	
+0x03130	102	
+0x03200	208	
+0x032d0	39	
+0x03300	100	
+0x03370	4504	preview-water ; 喝水 ; 去接杯水吧，顺便起来活动一下～ ; preview-work ; 整理今日工作
+0x04510	2095	LocalTools ; WorkReminder ; 工作提醒助手 ; Microsoft YaHei UI ; :/assets/reminder.png
+0x04d60	950	QDialog { background: #f7f9fc; }QLabel#m ; 取消 ; 删除 ; dangerButton
+0x05120	950	QDialog { background: #f7f9fc; }QLabel#m ; 退出
+0x054e0	438	messageTitle ; messageText
+0x05700	1427	QDialog { background: #f7f9fc; }QLabel#m ; 关于工作提醒助手
+0x05ca0	693	QDialog { background: #f7f9fc; }QLabel#m ; 知道了 ; primaryButton
+0x05f60	530	
+0x06200	258	
+0x06310	3415	trayPopup ; popupPanel ; 盯梢小能手 ; popupTitle ; 别忘了照顾好自己呀
+0x070b0	46	
+0x070e0	46	
+0x07120	64	
+0x07160	100	
+0x071d0	85	
+0x07230	894	#2466a8 ; #dcecff
+0x075b0	98	
+0x07620	70	
+0x07670	70	
+0x076c0	122	
+0x07740	123	
+0x077c0	70	
+0x07880	879	
+0x07bf0	3357	还没有提醒，点下方按钮新建一个吧。 ; empty ; taskCard ; 暂停此提醒 ; 启用此提醒
+0x08910	60	
+0x08950	140	
+0x089e0	200	
+0x08ab0	124	
+0x08b30	366	
+0x08ca0	388	
+0x08e30	176	
+0x08ee0	781	
+0x091f0	1557	QComboBox { min-height: 38px; padding: 0 ; unitSwitch ; 分钟 ; 小时 ; unitOption
+0x09810	549	时 ; 分
+0x09a40	546	yyyy-MM-dd HH:mm ; :/assets/chevron.png
+0x09c70	135	
+0x09d00	11237	QComboBox { min-height: 38px; padding: 0 ; 设置提醒任务 ; 把要做的事情和时间告诉我，到点就来提醒你。 ; hintLabel ; 例如：喝水
+0x0c940	52	
+0x0c980	52	
+0x0c9c0	52	
+0x0ca00	52	
+0x0ca40	204	
+0x0cb10	1291	信息不完整 ; 请填写任务名称。 ; 时间不正确 ; 一次性提醒时间必须晚于当前时间。 ; 请至少选择一个星期日期。
+0x0d020	78	
+0x0d070	112	
+0x0d0e0	923	一 ; 二 ; 三 ; 四 ; 五
+0x0d480	221	modernSpin
+0x0d560	628	QComboBox { min-height: 38px; padding: 0 ; timePartCombo ; %1
+0x0d7e0	136	
+0x0d870	168	
+0x0d920	243	
+0x0da20	275	
+0x0db40	150	
+0x0dc10	124	
+0x0dc90	132	
+0x0dd50	24	
+0x0dd68	51	
+0x0dd9b	13	
+0x0ddb0	179	
+0x0de70	109	
+0x0dee0	1800	dateTimePopup ; 选择日期和时间 ; pickerTitle ; modernCalendar ; 提醒时间
+0x0e620	60	
+0x0e6a0	1535	， ; , ; ； ; ; ;  
+0x0eca0	1213	
+0x0f160	170	
+0x0f250	100	
+0x0f2c0	353	
+0x0f430	219	
+0x0f510	1164	, 
+0x0f9a0	125	
+0x0fa20	1852	
+0x10160	150	
+0x10200	246	
+0x10300	4317	mainBackground ; 我的提醒 ; headingLabel ; 关掉窗口也没关系，我会继续在系统托盘等着提醒你。 ; tablePanel
+0x11400	52	
+0x11450	128	
+0x114d0	144	
+0x11560	144	
+0x115f0	96	
+0x11650	180	
+0x11710	3604	#9ca3af ; 今日已暂停 ; 使用计时中 ; 等待下次开机 ; #d94848
+0x12530	35	
+0x12560	123	
+0x125e0	4105	提醒：%1 ; contentPanel ; :/assets/bell.png ; 叮咚～ 到时间啦！ ; 番茄钟响啦～
+0x13610	52	
+0x13720	26	
+0x1373a	213	
+0x1380f	29	
+0x13830	75	
+0x13880	80	
+0x138d0	108	
+0x13940	566	
+0x13b80	164	
+0x13c30	237	
+0x13d20	621	
+0x13f90	110	
+0x14000	436	确定删除“%1”吗？删除后无法恢复。
+0x141e0	318	
+0x14320	40	
+0x14348	78	
+0x14396	84	
+0x143f0	116	
+0x144a0	156	
+0x14670	77	
+0x146bd	138	
+0x14747	54	
+0x14780	377	工作提醒助手 · %1 个任务已启用
+0x14900	452	
+0x14ad0	174	退出工作提醒助手 ; 退出后将不会再弹出提醒，确定要退出吗？
+0x14b80	190	保存失败
+0x14c40	449	
+0x14e10	208	
+0x14ee0	885	
+0x15260	3520	读取配置失败 ; 无法启动 ; 当前系统没有可用的系统托盘。 ; startupChoiceInitialized ; 我会在系统托盘一直等着，到点就来提醒你。
+0x16020	200	
+0x160f0	700	
+0x163b0	3504	每 %1 小时 ; 每 %1 分钟 ; 每天 %1 ; 一次：%1 ; 周%1 %2
+0x17160	520	
+0x17370	4654	09:00:00 ; 18:00:00
+0x185a0	221	
+0x18680	206	
+0x18750	480	
+0x18930	455	
+0x18b00	478	
+0x18ce0	1003	
+0x190d0	300	daily ; once ; weekly ; workdays ; monthly
+0x19200	3667	lastDay ; lastWorkday ; day ; id ; title
+0x1a060	717	、
+0x1a360	307	
+0x1a4a0	204	
+0x1a570	609	
+0x1a7e0	203	reminders.json
+0x1a8b0	113	
+0x1a930	1430	无法读取配置文件：%1 ; 配置文件格式不正确：%1 ; tasks
+0x1aed0	69	
+0x1af20	1327	无法创建配置目录。 ; version ; 无法保存配置：%1 ; 无法提交配置：%1
+0x1b460	164	
+0x1b510	1070	
+0x1b93e	2046	

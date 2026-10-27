@@ -1,0 +1,44 @@
+[workspace]
+members = ["reminder-core"]
+
+[package]
+name = "work-reminder"
+version = "2.0.0"
+edition = "2021"
+authors = ["Ma Xin <maxin.zhang@users.noreply.github.com>"]
+description = "A lightweight Windows tray reminder with 12 schedule types"
+license = "MIT"
+readme = "../README.md"
+
+# The whole product is one binary; the front end is embedded at compile time.
+[[bin]]
+name = "work-reminder"
+path = "src/main.rs"
+
+[dependencies]
+# The scheduling core is platform-independent and is reused verbatim from the
+# Win32 build. Keeping it as a path dependency means both front ends share one
+# copy of the engine, so a fix in the scheduler applies to both.
+reminder_core = { path = "reminder-core", package = "work-reminder-core" }
+
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-autostart = "2"
+# A second launch must surface the running instance, not start a rival
+# scheduler over the same file.
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+# The linker for x86_64-pc-windows-gnu is left at rustc's default, which is
+# x86_64-w64-mingw32-gcc. Overriding it requires .cargo/config.toml (`linker` is not a
+# manifest key) and is unnecessary here.
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
