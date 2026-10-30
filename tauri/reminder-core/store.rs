@@ -82,6 +82,12 @@ pub fn config_path(org: &str, app: &str) -> PathBuf {
 
 /// Read the store. A missing file is treated as an empty store; a malformed
 /// file is an error, never a silent truncation.
+///
+/// When the file exists but cannot be parsed, a byte-for-byte copy is left next
+/// to it (`reminders.json.<timestamp>.bad`) before the error is returned. The
+/// caller proceeds with an empty task list, and the first save then overwrites
+/// the unreadable file — without the copy, that overwrite destroys the only
+/// evidence of what went wrong.
 pub fn load(path: &Path) -> Result<Store, StoreError> {
     let raw = match fs::read_to_string(path) {
         Ok(s) => s,
@@ -91,11 +97,35 @@ pub fn load(path: &Path) -> Result<Store, StoreError> {
     if raw.trim().is_empty() {
         return Ok(Store::default());
     }
-    let store: Store = serde_json::from_str(&raw).map_err(|e| StoreError::Parse(e.to_string()))?;
+    let store: Store = serde_json::from_str(&raw).map_err(|e| {
+        backup_corrupt_file(path);
+        StoreError::Parse(e.to_string())
+    })?;
     if store.version > SCHEMA_VERSION {
         return Err(StoreError::UnsupportedVersion(store.version));
     }
     Ok(store)
+}
+
+/// Copy an unparsable config file aside, best effort, so the next save cannot
+/// destroy it. The name embeds the current local time so successive failures
+/// never clobber each other.
+fn backup_corrupt_file(path: &Path) {
+    let stamp = crate::time::now_local();
+    let backup = path.with_extension(format!(
+        "json.{}{:02}{:02}-{:02}{:02}{:02}.bad",
+        stamp.date.year,
+        stamp.date.month,
+        stamp.date.day,
+        stamp.time.hour,
+        stamp.time.minute,
+        stamp.time.second
+    ));
+    if let Err(e) = fs::copy(path, &backup) {
+        // Nothing better to do: the caller already reports the parse error, and
+        // a failed backup must not mask it with a second one.
+        eprintln!("store: 备份损坏配置失败 ({}): {e}", backup.display());
+    }
 }
 
 /// Write the store atomically: temporary sibling file, fsync, then rename.
@@ -418,6 +448,25 @@ mod tests {
             Err(StoreError::Parse(_)) => {}
             other => panic!("expected parse error, got {:?}", other.map(|s| s.tasks.len())),
         }
+    }
+
+    #[test]
+    fn malformed_load_leaves_a_backup_copy_behind() {
+        // The next save overwrites the unreadable file, so the parse error path
+        // must copy it aside first or the evidence is gone.
+        let dir = temp_dir("backup");
+        let path = dir.join("reminders.json");
+        fs::write(&path, b"{ not json ").unwrap();
+        assert!(load(&path).is_err());
+        let backups: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n.ends_with(".bad"))
+            .collect();
+        assert_eq!(backups.len(), 1, "one .bad backup expected: {backups:?}");
+        let content = fs::read(dir.join(&backups[0])).unwrap();
+        assert_eq!(content, b"{ not json ");
     }
 
     #[test]

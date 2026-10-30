@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Civil date (proleptic Gregorian).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Date {
     pub year: i32,
     pub month: u32,
@@ -18,7 +18,7 @@ pub struct Date {
 }
 
 /// Wall-clock time of day with second resolution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct TimeOfDay {
     pub hour: u32,
     pub minute: u32,
@@ -26,7 +26,7 @@ pub struct TimeOfDay {
 }
 
 /// A civil datetime, ordered lexicographically by field.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DateTime {
     pub date: Date,
     pub time: TimeOfDay,

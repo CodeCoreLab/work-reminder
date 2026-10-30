@@ -579,15 +579,30 @@ fn config_path() -> PathBuf {
 // ---------------------------------------------------------------- lifecycle
 
 
-/// Append a line to `%TEMP%/work-reminder.log`.
+/// Append a line to `<exe dir>/work-reminder-YYYY-MM-DD.log`.
 ///
 /// A GUI binary has no console, so a failure before the window exists is otherwise
 /// invisible. This is deliberate, permanent instrumentation for that startup window
 /// where no UI can report anything.
+///
+/// The file name carries the local date, which rotates the log daily without a
+/// dependency: yesterday's file is simply never opened again. `%TEMP%` can be
+/// redirected or unwritable under a restricted token, so the executable's own
+/// directory is tried first; a diagnostic that silently fails is not a diagnostic.
 fn trace(msg: &str) {
     use std::io::Write;
-    // Write next to the executable: %TEMP% can be redirected or unwritable under a
-    // restricted token, and a diagnostic that silently fails is not a diagnostic.
+
+    // Local date from the same clock the engine uses, formatted once per call.
+    let stamp = time::now_local();
+    let day = format!(
+        "{:04}-{:02}-{:02}",
+        stamp.date.year, stamp.date.month, stamp.date.day
+    );
+    let line = format!(
+        "[{} {:02}:{:02}:{:02}] {msg}",
+        day, stamp.time.hour, stamp.time.minute, stamp.time.second
+    );
+
     let mut bases = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -596,13 +611,13 @@ fn trace(msg: &str) {
     }
     bases.push(std::env::temp_dir());
     for base in bases {
-        let target = base.join("work-reminder.log");
+        let target = base.join(format!("work-reminder-{day}.log"));
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&target)
         {
-            let _ = writeln!(f, "[{}] {msg}", std::process::id());
+            let _ = writeln!(f, "{line}");
             let _ = f.flush();
             return;
         }
@@ -737,12 +752,22 @@ fn start_ticker(app: AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(TICK_MS));
         let state = app.state::<Mutex<AppState>>();
+        // Catch panics from the tick: with `panic = "abort"` in release a panic
+        // here would kill the whole process — tray, reminders and all — because
+        // of one bad schedule value. A tick that panics is skipped and logged
+        // instead; the state it guards stays structurally sound.
         let fired = {
             let mut st = match state.lock() {
                 Ok(g) => g,
                 Err(p) => p.into_inner(),
             };
-            advance(&mut st)
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| advance(&mut st))) {
+                Ok(fired) => fired,
+                Err(_) => {
+                    trace("tick panicked; tick skipped, state preserved");
+                    continue;
+                }
+            }
         };
         if fired.is_empty() {
             continue;

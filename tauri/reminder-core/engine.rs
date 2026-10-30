@@ -45,6 +45,18 @@ pub struct Firing<'a> {
     pub kind: FiringKind,
 }
 
+/// Dedup key for pomodoro heads-ups: one entry per (task, phase), so a new
+/// phase always gets its own announcement and an old phase can never suppress
+/// a new one.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct PreAlertKey {
+    id: String,
+    /// The `next_trigger` this announcement belongs to. `None` is never a key
+    /// in practice (pre_alert_due only returns `Some(Some(..))`) but is kept
+    /// total so the map needs no special casing.
+    phase: Option<DateTime>,
+}
+
 /// Drives all tasks forward. Owns the auxiliary runtime counters that the
 /// original implementation kept in scattered struct fields.
 pub struct Engine {
@@ -56,10 +68,11 @@ pub struct Engine {
     /// task, so a scan per task made the whole tick O(n²). Measured cost at 1000
     /// tasks dropped from ~16 ms to well under a millisecond after this change.
     usage: HashMap<String, i64>,
-    /// Tasks whose pomodoro pre-alert has already been shown for the current
-    /// cycle, keyed by (task id, phase), so the heads-up is emitted exactly once
-    /// per phase without scanning.
-    pre_alerted: HashMap<String, Option<DateTime>>,
+    /// Pomodoro heads-ups already shown, keyed by (task id, phase trigger).
+    /// Keying on the phase — not just the id — means the next phase of the same
+    /// task is announced exactly once too, without relying on the firing path
+    /// to clear the marker first.
+    pre_alerted: std::collections::HashSet<PreAlertKey>,
     /// Instant this process started; anchors `AfterStartup` schedules.
     pub started_at: DateTime,
 }
@@ -69,7 +82,7 @@ impl Engine {
         Self {
             last_tick: None,
             usage: HashMap::new(),
-            pre_alerted: HashMap::new(),
+            pre_alerted: std::collections::HashSet::new(),
             started_at,
         }
     }
@@ -142,13 +155,15 @@ impl Engine {
             // dedupe set changes here, not the schedule.
             let emit_pre_alert = match pre_alert_due(task, now) {
                 Some(phase) => {
-                    // HashMap insert returns the previous value: `None` means this
-                    // phase had not been announced yet.
-                    let already = self
-                        .pre_alerted
-                        .insert(task.id.clone(), phase)
-                        .is_some();
-                    !already
+                    let key = PreAlertKey {
+                        id: task.id.clone(),
+                        phase,
+                    };
+                    // `HashSet::insert` returns true when the key was new, i.e.
+                    // this (task, phase) has not been announced yet. (The old
+                    // `HashMap::insert` had the opposite shape: it returned the
+                    // previous value, so `is_some()` meant "already announced".)
+                    self.pre_alerted.insert(key)
                 }
                 None => false,
             };
@@ -170,8 +185,11 @@ impl Engine {
                 // Reset the counter so the next break is measured from here.
                 self.set_usage(&task.id, 0);
             }
-            // The real firing consumed that phase; drop its heads-up marker.
-            self.pre_alerted.remove(&task.id);
+            // The real firing consumed the phase; drop any heads-up marker left
+            // for it (and only it) so a re-armed phase starts clean.
+            let id = task.id.clone();
+            let phase = task.next_trigger;
+            self.pre_alerted.remove(&PreAlertKey { id, phase });
             fired.push(Firing {
                 task: &*task,
                 outcome,
@@ -190,7 +208,7 @@ impl Engine {
         let live: std::collections::HashSet<&str> =
             tasks.iter().map(|t| t.id.as_str()).collect();
         self.usage.retain(|id, _| live.contains(id.as_str()));
-        self.pre_alerted.retain(|id, _| live.contains(id.as_str()));
+        self.pre_alerted.retain(|k| live.contains(k.id.as_str()));
     }
 
     pub fn usage_seconds_of(&self, id: &str) -> i64 {
@@ -199,13 +217,26 @@ impl Engine {
 
     /// Whether a pre-alert has already been emitted for `id` at `phase`.
     pub fn pre_alerted_for(&self, id: &str, phase: Option<DateTime>) -> bool {
-        self.pre_alerted.get(id).map(|at| *at == phase).unwrap_or(false)
+        self.pre_alerted.contains(&PreAlertKey {
+            id: id.to_string(),
+            phase,
+        })
+    }
+
+    /// Test-only direct insert into the dedupe set.
+    #[cfg(test)]
+    fn pre_alerted_insert_public(&mut self, id: &str, phase: Option<DateTime>) {
+        self.pre_alerted.insert(PreAlertKey {
+            id: id.to_string(),
+            phase,
+        });
     }
 }
 
 /// The phase a pomodoro heads-up belongs to, if one is due right now.
 ///
-/// Returns the current `next_trigger` as the phase key so the caller can dedupe.
+/// Returns the current `next_trigger` as the phase key so the caller can dedupe
+/// per (task, phase) instead of per task.
 fn pre_alert_due(task: &Task, now: DateTime) -> Option<Option<DateTime>> {
     if !matches!(task.schedule, Schedule::Pomodoro { .. }) || !task.enabled {
         return None;
@@ -342,6 +373,7 @@ mod tests {
         assert!(engine.tick(&mut tasks, start, 0).is_empty());
     }
 
+
     #[test]
     fn pomodoro_emits_one_pre_alert_before_firing() {
         let start = dt(2026, 10, 22, 9, 0);
@@ -450,6 +482,64 @@ mod tests {
             0,
         );
         assert!(r.is_empty(), "daily tasks get no heads-up");
+    }
+
+    #[test]
+    fn pre_alert_keys_are_per_phase_not_per_task() {
+        // Regression: the dedupe set was keyed by task id alone, so a marker
+        // left by one phase could leak into the next via any path that did not
+        // run the firing cleanup (an edit re-arming the schedule, for example).
+        let start = dt(2026, 10, 22, 9, 0);
+        let mut engine = Engine::new(start);
+        let phase_a = dt(2026, 10, 22, 9, 25);
+        let phase_b = dt(2026, 10, 22, 9, 30);
+
+        engine.pre_alerted_insert_public("p1", Some(phase_a));
+        assert!(engine.pre_alerted_for("p1", Some(phase_a)));
+        // A different phase of the same task must not be considered alerted.
+        assert!(!engine.pre_alerted_for("p1", Some(phase_b)));
+        // Nor a different task in the same phase slot.
+        assert!(!engine.pre_alerted_for("p2", Some(phase_a)));
+    }
+
+    #[test]
+    fn editing_next_trigger_lets_the_new_phase_alert_again() {
+        // A task whose phase is re-armed externally (save_task recomputes
+        // next_trigger) must be allowed a fresh heads-up for the new phase,
+        // even if the old phase already had one.
+        let start = dt(2026, 10, 22, 9, 0);
+        let mut engine = Engine::new(start);
+        let mut task = Task::new(
+            "p1",
+            "专注",
+            Schedule::Pomodoro {
+                work_minutes: 25,
+                break_minutes: 5,
+                cycles: 4,
+            },
+        );
+        task.next_trigger = Some(dt(2026, 10, 22, 9, 25));
+        let mut tasks = vec![task];
+
+        // First phase gets its heads-up at 09:24:56.
+        let t = DateTime::new(
+            crate::time::Date::new(2026, 10, 22),
+            TimeOfDay::new(9, 24, 56),
+        );
+        assert_eq!(engine.tick(&mut tasks, t, 0).len(), 1);
+
+        // The user edits the task: next_trigger re-armed to 10:00.
+        tasks[0].next_trigger = Some(dt(2026, 10, 22, 10, 0));
+        engine.retain_known(&tasks);
+
+        // Inside the new phase's window the heads-up must fire again.
+        let t2 = DateTime::new(
+            crate::time::Date::new(2026, 10, 22),
+            TimeOfDay::new(9, 59, 56),
+        );
+        let r = engine.tick(&mut tasks, t2, 0);
+        assert_eq!(r.len(), 1, "new phase deserves its own heads-up");
+        assert_eq!(r[0].kind, FiringKind::PreAlert);
     }
 
     #[test]

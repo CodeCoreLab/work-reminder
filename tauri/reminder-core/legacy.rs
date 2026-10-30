@@ -3,6 +3,15 @@
 //
 // Import of the reference implementation's config file.
 //
+// STATUS (2026-10): kept, but not wired into the Tauri front end yet. The
+// module is public API of reminder-core and `docs/feature-parity.md` #24 plus
+// the README list it as the v1 migration path, so it must not be deleted; the
+// Tauri `main.rs` never gained the call (`legacy::import_from_disk` has no
+// caller outside this file's tests). Wiring it in means: on startup, when the
+// new store does not exist, try the legacy path first and persist the result.
+// Until then treat this as an exported, tested library function awaiting a
+// caller.
+//
 // The original program stored its tasks at
 //   %APPDATA%\LocalTools\WorkReminder\reminders.json
 // as a flat object per task: every schedule kind's parameters lived side by side

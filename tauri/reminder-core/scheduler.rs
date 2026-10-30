@@ -48,7 +48,7 @@ pub fn next_trigger(schedule: &Schedule, now: DateTime, anchor: DateTime) -> Opt
             monthly_mode,
             monthly_day,
             daily_time,
-        } => Some(next_monthly(*monthly_mode, *monthly_day, *daily_time, now)),
+        } => next_monthly(*monthly_mode, *monthly_day, *daily_time, now),
         Schedule::MultiDaily { daily_times } => next_multi_daily(daily_times, now),
         Schedule::TimedInterval {
             weekdays_mask,
@@ -106,16 +106,23 @@ fn next_masked_day(mask: u8, at: TimeOfDay, now: DateTime) -> Option<DateTime> {
     None
 }
 
-fn next_monthly(mode: MonthlyMode, day: u32, at: TimeOfDay, now: DateTime) -> DateTime {
-    // Try this month first, then advance month by month until an occurrence is
-    // strictly in the future. Twelve attempts always suffice.
+/// The first Monthly occurrence strictly after `now`, or `None` when twelve
+/// consecutive months yield no anchor.
+///
+/// Twelve months is enough for every valid input: each month contributes at
+/// most one anchor and at least one month always has one (LastDay/LastWorkday
+/// anchor to the month's own end; Day anchors whenever the clamped day exists).
+/// The old fallback — "tomorrow at the same time" — silently turned a broken
+/// monthly schedule into a daily one, so it is gone: an impossible schedule
+/// finishes the task instead of firing daily.
+fn next_monthly(mode: MonthlyMode, day: u32, at: TimeOfDay, now: DateTime) -> Option<DateTime> {
     let mut year = now.date.year;
     let mut month = now.date.month;
     for _ in 0..12 {
         if let Some(date) = monthly_anchor(year, month, mode, day) {
             let candidate = DateTime::new(date, at);
             if candidate > now {
-                return candidate;
+                return Some(candidate);
             }
         }
         if month == 12 {
@@ -125,8 +132,7 @@ fn next_monthly(mode: MonthlyMode, day: u32, at: TimeOfDay, now: DateTime) -> Da
             month += 1;
         }
     }
-    // Unreachable for valid input; fall back to "today plus a month".
-    DateTime::new(now.date.next_day(), at)
+    None
 }
 
 fn monthly_anchor(year: i32, month: u32, mode: MonthlyMode, day: u32) -> Option<Date> {
@@ -430,6 +436,37 @@ mod tests {
         assert_eq!(
             next_trigger(&s, now, now),
             Some(dt(2026, 2, 28, 9, 0))
+        );
+    }
+
+    #[test]
+    fn monthly_day_31_rolls_to_next_month_with_30_days() {
+        // Asking for the 31st after 30 Nov 09:00 must land on 31 Dec — never
+        // fall back to 1 Dec ("tomorrow"), which would fire a monthly task
+        // daily until the real anchor.
+        let s = Schedule::Monthly {
+            monthly_mode: MonthlyMode::Day,
+            monthly_day: 31,
+            daily_time: TimeOfDay::new(9, 0, 0),
+        };
+        let now = dt(2026, 11, 30, 10, 0);
+        assert_eq!(
+            next_trigger(&s, now, now),
+            Some(dt(2026, 12, 31, 9, 0))
+        );
+    }
+
+    #[test]
+    fn monthly_after_december_wraps_to_next_year() {
+        let s = Schedule::Monthly {
+            monthly_mode: MonthlyMode::Day,
+            monthly_day: 15,
+            daily_time: TimeOfDay::new(9, 0, 0),
+        };
+        let now = dt(2026, 12, 16, 10, 0);
+        assert_eq!(
+            next_trigger(&s, now, now),
+            Some(dt(2027, 1, 15, 9, 0))
         );
     }
 
