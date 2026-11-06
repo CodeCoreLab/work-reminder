@@ -11,7 +11,7 @@
 use std::fs;
 use std::io;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -66,18 +66,6 @@ impl From<io::Error> for StoreError {
     fn from(e: io::Error) -> Self {
         Self::Io(e)
     }
-}
-
-/// Resolve the config file path.
-///
-/// `%APPDATA%\<org>\<app>\reminders.json`, matching the original
-/// `QStandardPaths::AppConfigLocation` resolution
-/// (`%APPDATA%\LocalTools\WorkReminder\reminders.json`).
-pub fn config_path(org: &str, app: &str) -> PathBuf {
-    let base = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    base.join(org).join(app).join("reminders.json")
 }
 
 /// Read the store. A missing file is treated as an empty store; a malformed
@@ -241,6 +229,7 @@ mod tests {
     use super::*;
     use crate::model::{Schedule, Task};
     use crate::time::{Date, DateTime, TimeOfDay};
+    use std::path::PathBuf;
 
     /// Scratch directory for one test, removed when the test process exits.
     ///
@@ -510,13 +499,6 @@ mod tests {
         let path = dir.join("reminders.json");
         fs::write(&path, b"").unwrap();
         assert!(load(&path).unwrap().tasks.is_empty());
-    }
-
-    #[test]
-    fn config_path_uses_appdata_layout() {
-        let p = config_path("LocalTools", "WorkReminder");
-        let s = p.to_string_lossy().replace('\\', "/");
-        assert!(s.ends_with("LocalTools/WorkReminder/reminders.json"), "got {}", s);
     }
 
     #[test]

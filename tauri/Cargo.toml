@@ -3,7 +3,7 @@ members = ["reminder-core"]
 
 [package]
 name = "work-reminder"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 authors = ["Ma Xin <maxin.zhang@users.noreply.github.com>"]
 description = "A lightweight Windows tray reminder with 12 schedule types"

@@ -3,15 +3,6 @@
 //
 // Import of the reference implementation's config file.
 //
-// STATUS (2026-10): kept, but not wired into the Tauri front end yet. The
-// module is public API of reminder-core and `docs/feature-parity.md` #24 plus
-// the README list it as the v1 migration path, so it must not be deleted; the
-// Tauri `main.rs` never gained the call (`legacy::import_from_disk` has no
-// caller outside this file's tests). Wiring it in means: on startup, when the
-// new store does not exist, try the legacy path first and persist the result.
-// Until then treat this as an exported, tested library function awaiting a
-// caller.
-//
 // The original program stored its tasks at
 //   %APPDATA%\LocalTools\WorkReminder\reminders.json
 // as a flat object per task: every schedule kind's parameters lived side by side
@@ -23,15 +14,18 @@
 // installation upgrades without retyping anything. The import is deliberately
 // lossy in one direction only: unknown keys are ignored, but a task that cannot
 // be understood is reported rather than silently dropped.
+//
+// The old and the new program live in different directories (`LocalTools` vs
+// `MaXin`), so an upgrade has to copy the data over. That copy is wired in by
+// `migrate_missing`, which the Tauri front end calls on startup when its own
+// store does not exist yet. Path resolution for both directories goes through
+// `crate::paths`, the single entry point, so the two can never drift apart.
 
 use serde::Deserialize;
 
 use crate::model::{MonthlyMode, Schedule, Task, WORKDAY_MASK};
+use crate::paths;
 use crate::time::{Date, DateTime, TimeOfDay};
-
-/// Legacy config directory name, as written by the original.
-pub const LEGACY_ORG: &str = "LocalTools";
-pub const LEGACY_APP: &str = "WorkReminder";
 
 /// One task as the original program wrote it. All fields optional so a partial
 /// or hand-edited file still yields something useful.
@@ -306,14 +300,50 @@ pub fn parse_datetime(text: &str) -> Option<DateTime> {
 }
 
 /// Path of the legacy config file under the current user profile.
+///
+/// 走 `crate::paths` 这个唯一入口，与 Tauri 前端解析当前配置目录用的是同一套规则。
 pub fn legacy_path() -> Option<std::path::PathBuf> {
-    std::env::var_os("APPDATA").map(|base| {
-        let mut p = std::path::PathBuf::from(base);
-        p.push(LEGACY_ORG);
-        p.push(LEGACY_APP);
-        p.push("reminders.json");
-        p
-    })
+    paths::legacy_config_path()
+}
+
+/// Import the legacy file into the current store, when the current store is absent.
+///
+/// The two programs write to different directories (`LocalTools` vs `MaXin`),
+/// so an upgrade would otherwise open an empty list: the old data is right
+/// there, but nothing reads it. This copies it over once — only when the
+/// current store does not exist yet, so a user who already migrated is never
+/// overwritten by a stale legacy file.
+///
+/// Returns the number of imported tasks (`0` when there was nothing to import).
+pub fn migrate_missing(current_path: &std::path::Path) -> Result<usize, String> {
+    match legacy_path() {
+        Some(old_path) => migrate_from(&old_path, current_path),
+        None => Ok(0),
+    }
+}
+
+/// Import `old_path` into `current_path` unless the latter already exists.
+///
+/// Split out from [`migrate_missing`] so the copy itself can be tested without
+/// touching the real `%APPDATA%`.
+pub fn migrate_from(
+    old_path: &std::path::Path,
+    current_path: &std::path::Path,
+) -> Result<usize, String> {
+    if current_path.exists() {
+        return Ok(0);
+    }
+    let Some(report) = import_from_disk(old_path)? else {
+        return Ok(0);
+    };
+    if report.tasks.is_empty() {
+        return Ok(0);
+    }
+    let mut store = crate::store::Store::default();
+    store.tasks = report.tasks;
+    crate::store::save(current_path, &store)
+        .map_err(|e| format!("保存迁移后的配置失败：{e}"))?;
+    Ok(store.tasks.len())
 }
 
 /// Read and convert the legacy file.
@@ -573,5 +603,88 @@ mod tests {
         assert_eq!(loaded.tasks.len(), 1);
         assert_eq!(loaded.tasks[0].title, "喝水");
         assert_eq!(loaded.tasks[0].message, "接杯水");
+    }
+
+    /// A39：legacy 模块与 Tauri 前端必须经由同一个入口解析配置目录，
+    /// 否则两处各自拼路径就会漂移成两个不同的目录。
+    #[test]
+    fn legacy_path_goes_through_the_shared_paths_module() {
+        let base = crate::paths::config_base().expect("APPDATA");
+        let p = legacy_path().expect("legacy path");
+        assert_eq!(
+            p,
+            crate::paths::config_path_under(&base, crate::paths::LEGACY_ORG, crate::paths::LEGACY_APP),
+            "legacy 路径必须由 paths 模块解析"
+        );
+    }
+
+    /// A39 回归：升级用户的新目录为空时，旧目录里的提醒必须被搬过来。
+    ///
+    /// 缺陷版本下这里没有任何迁移调用，`migrate_from` 不存在，
+    /// 升级后打开的是空列表。
+    #[test]
+    fn migration_copies_legacy_tasks_into_the_new_directory() {
+        let dir = std::env::temp_dir().join("work-reminder-test-migrate");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        crate::store::register_temp_cleanup(dir.clone());
+        let old_path = dir.join("old").join("reminders.json");
+        std::fs::create_dir_all(old_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &old_path,
+            r#"{"tasks":[{"id":"a","title":"喝水","scheduleType":"interval","intervalMinutes":30}]}"#
+                .as_bytes(),
+        )
+        .unwrap();
+        let new_path = dir.join("new").join("reminders.json");
+
+        let imported = migrate_from(&old_path, &new_path).unwrap();
+        assert_eq!(imported, 1, "旧配置里的提醒必须被迁移过来");
+        let loaded = crate::store::load(&new_path).unwrap();
+        assert_eq!(loaded.tasks.len(), 1);
+        assert_eq!(loaded.tasks[0].title, "喝水");
+    }
+
+    /// A39 回归：已经迁移过的用户不能被旧的 legacy 文件覆盖。
+    #[test]
+    fn migration_never_overwrites_an_existing_new_store() {
+        let dir = std::env::temp_dir().join("work-reminder-test-migrate-nowrite");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        crate::store::register_temp_cleanup(dir.clone());
+        let old_path = dir.join("old").join("reminders.json");
+        std::fs::create_dir_all(old_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &old_path,
+            r#"{"tasks":[{"id":"a","title":"旧","scheduleType":"interval","intervalMinutes":30}]}"#
+                .as_bytes(),
+        )
+        .unwrap();
+        let new_path = dir.join("new").join("reminders.json");
+        let mut store = crate::store::Store::default();
+        store.tasks = vec![Task::new(
+            "b",
+            "新",
+            Schedule::Interval { interval_minutes: 60 },
+        )];
+        crate::store::save(&new_path, &store).unwrap();
+
+        assert_eq!(migrate_from(&old_path, &new_path).unwrap(), 0);
+        let loaded = crate::store::load(&new_path).unwrap();
+        assert_eq!(loaded.tasks.len(), 1);
+        assert_eq!(loaded.tasks[0].title, "新", "新配置不得被旧文件覆盖");
+    }
+
+    /// 没有 legacy 文件时迁移是空操作，不报错。
+    #[test]
+    fn migration_without_a_legacy_file_is_a_no_op() {
+        let dir = std::env::temp_dir().join("work-reminder-test-migrate-none");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        crate::store::register_temp_cleanup(dir.clone());
+        let old_path = dir.join("old").join("reminders.json");
+        let new_path = dir.join("new").join("reminders.json");
+        assert_eq!(migrate_from(&old_path, &new_path).unwrap(), 0);
+        assert!(!new_path.exists());
     }
 }

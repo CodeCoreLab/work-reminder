@@ -226,8 +226,11 @@ impl DateTime {
 }
 
 /// Signed day difference `b - a`.
+///
+/// 实现必须是 `b - a`：调用方 `seconds_until` 依赖 `days * 86_400 + other_time - self_time`
+/// 的语义，即「目标日 - 起始日」。曾写成 `a - b`（符号反向），导致跨日时间差全为负值。
 fn days_between(a: &Date, b: &Date) -> i64 {
-    to_epoch_day(a) - to_epoch_day(b)
+    to_epoch_day(b) - to_epoch_day(a)
 }
 
 /// Days since 1970-01-01 (Howard Hinnant's algorithm, days_from_civil).
@@ -287,6 +290,37 @@ mod tests {
         let b = DateTime::new(Date::new(2026, 10, 22), TimeOfDay::new(11, 30, 0));
         assert_eq!(a.minutes_until(&b), 90);
         assert_eq!(b.minutes_until(&a), -90);
+    }
+
+    /// B07 回归：`days_between` 的符号语义必须是「目标日 - 起始日」。
+    ///
+    /// 缺陷版本写成 `a - b`（符号反向），跨日时间差全部为负。
+    /// 覆盖跨日的正负两个方向（以及同日为零）。
+    #[test]
+    fn days_between_is_signed_across_days() {
+        let a = Date::new(2026, 10, 22);
+        let b = Date::new(2026, 10, 24);
+        assert_eq!(days_between(&a, &b), 2, "目标日晚于起始日应为正");
+        assert_eq!(days_between(&b, &a), -2, "目标日早于起始日应为负");
+        assert_eq!(days_between(&a, &a), 0, "同一天应为 0");
+    }
+
+    /// B07 回归：跨月的两天同样遵循「目标日 - 起始日」。
+    #[test]
+    fn days_between_is_signed_across_month_boundary() {
+        let a = Date::new(2026, 1, 31);
+        let b = Date::new(2026, 2, 1);
+        assert_eq!(days_between(&a, &b), 1);
+        assert_eq!(days_between(&b, &a), -1);
+    }
+
+    /// B07 回归：跨日的时间差在分钟层面同样为正（缺陷版本为负）。
+    #[test]
+    fn minutes_until_is_signed_across_days() {
+        let a = DateTime::new(Date::new(2026, 10, 22), TimeOfDay::new(23, 30, 0));
+        let b = DateTime::new(Date::new(2026, 10, 23), TimeOfDay::new(0, 30, 0));
+        assert_eq!(a.minutes_until(&b), 60);
+        assert_eq!(b.minutes_until(&a), -60);
     }
 
     #[test]

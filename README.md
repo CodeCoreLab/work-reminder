@@ -145,6 +145,7 @@ tools/
 | 项 | 位置 |
 |---|---|
 | 配置 | `%APPDATA%\MaXin\WorkReminder\reminders.json` |
+| 旧版配置 | `%APPDATA%\LocalTools\WorkReminder\reminders.json`（升级时自动导入一次） |
 | 自启动 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 下的注册表项 |
 
 配置格式（`scheduleType` 为判别式标签，其余字段按类型变化）：

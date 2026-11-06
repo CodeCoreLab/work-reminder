@@ -571,9 +571,9 @@ fn play_chime() {
 fn play_chime() {}
 
 fn config_path() -> PathBuf {
-    // Same directory as the Win32 build, so an existing reminders.json keeps
-    // working: switching front ends must not look like data loss.
-    store::config_path("MaXin", "WorkReminder")
+    // 路径解析统一走 reminder_core::paths（唯一入口），与 legacy 迁移模块共用
+    // 同一套规则，两个目录不会再各自拼一份而漂移。
+    reminder_core::paths::current_config_path()
 }
 
 // ---------------------------------------------------------------- lifecycle
@@ -652,6 +652,15 @@ fn main() {
     }
     let path = config_path();
     trace(&format!("config path {}", path.display()));
+    // Upgrade path: the old program wrote to `%APPDATA%\LocalTools\WorkReminder`,
+    // this one to `%APPDATA%\MaXin\WorkReminder`. Without the copy an upgrading
+    // user opens an empty list even though their reminders are still on disk.
+    // Only runs when our own store is absent, so it can never clobber it.
+    match reminder_core::legacy::migrate_missing(&path) {
+        Ok(0) => {}
+        Ok(n) => trace(&format!("migrated {n} tasks from the legacy config")),
+        Err(e) => trace(&format!("legacy migration failed: {e}")),
+    }
     // `StoreError` has no NotFound variant: a missing file is only known before the
     // read, so decide that here rather than treating every IO error as data loss.
     let (mut tasks, load_error) = if !path.exists() {

@@ -81,7 +81,7 @@
 | 21 | JSON 单文件原子写 | `QSaveFile::commit` | tmp + fsync + rename | ✔ 单测 |
 | 22 | 损坏文件报错不覆盖 | `配置文件格式不正确` | `StoreError::Parse` | ✔ 单测 |
 | 23 | 版本字段校验 | 只写不读 | `UnsupportedVersion` 拒绝 | ✔ 增强 |
-| 24 | 旧版配置迁移 | `LocalTools\WorkReminder` | `legacy::import_from_disk` | ✔ 实测 4/5 导入 |
+| 24 | 旧版配置迁移 | `LocalTools\WorkReminder` | `legacy::migrate_missing` | ✔ 单测 4/5 导入 |
 
 ### 2.4 系统集成（7 项）
 

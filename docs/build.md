@@ -178,7 +178,7 @@ work-reminder.exe --params once   打印 once 类型的参数表与默认值
 
 | 验证项 | 方式 | 结果 |
 |---|---|---|
-| 单元测试 | `cd tauri/reminder-core && cargo test --lib` | ✔ 67 passed / 0 failed |
+| 单元测试 | `cd tauri/reminder-core && cargo test --lib` | ✔ 84 passed / 0 failed |
 | 交叉编译 | `python tools/build_tauri.py` | ✔ 产物生成，SHA-256 校验一致 |
 | 纯逻辑验证 | `python tools/verify_logic.py` | ✔ 12 种调度参数表全部符合预期 |
 | 全链路验收 | `python tools/final_verify.py` | ✔ 渲染 → 表单 → IPC → 落盘全通 |

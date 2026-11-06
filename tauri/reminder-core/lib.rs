@@ -8,6 +8,7 @@
 pub mod engine;
 pub mod legacy;
 pub mod model;
+pub mod paths;
 pub mod scheduler;
 pub mod store;
 pub mod time;
