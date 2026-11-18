@@ -555,7 +555,7 @@ fn idle_seconds() -> i64 {
     use std::sync::OnceLock;
     static XSS: OnceLock<Option<libloading::Library>> = OnceLock::new();
     let lib = match XSS
-        .get_or_init(|| libloading::Library::new("libXss.so.1").ok())
+        .get_or_init(|| unsafe { libloading::Library::new("libXss.so.1").ok() })
         .as_ref()
     {
         Some(l) => l,
