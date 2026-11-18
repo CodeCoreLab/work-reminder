@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "工作提醒助手",
+  "productName": "work-reminder",
   "version": "2.0.0",
   "identifier": "cn.gf.workreminder",
   "build": {
