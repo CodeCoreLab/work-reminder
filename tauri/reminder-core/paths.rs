@@ -25,9 +25,20 @@ pub const LEGACY_APP: &str = "WorkReminder";
 /// 配置文件名。
 pub const CONFIG_FILE: &str = "reminders.json";
 
-/// 配置根目录：`%APPDATA%`，缺失时为 `None`。
+/// 配置根目录：Windows = `%APPDATA%`；Linux（信创麒麟/UOS）= `$XDG_CONFIG_HOME`
+/// （缺省 `~/.config`）。缺失时为 `None`。
 pub fn config_base() -> Option<PathBuf> {
-    std::env::var_os("APPDATA").map(PathBuf::from)
+    #[cfg(windows)]
+    {
+        std::env::var_os("APPDATA").map(PathBuf::from)
+    }
+    #[cfg(not(windows))]
+    {
+        match std::env::var_os("XDG_CONFIG_HOME") {
+            Some(v) if !v.is_empty() => Some(PathBuf::from(v)),
+            _ => std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")),
+        }
+    }
 }
 
 /// 在给定根目录下拼出 `<root>/<org>/<app>/reminders.json`。

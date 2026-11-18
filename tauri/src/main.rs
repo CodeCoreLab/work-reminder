@@ -549,7 +549,58 @@ fn idle_seconds() -> i64 {
 
 #[cfg(not(windows))]
 fn idle_seconds() -> i64 {
-    0
+    // Linux（信创）：读 X11 扩展的 XScreenSaverInfo(idle) —— 麒麟/UOS 桌面
+    // （UKUI/Deepin 基于 X11）均可用。dlopen libXss.so.1，失败或查询失败
+    // 一律返回 0（偏向「用户在场」，漏报优于误报，与 Windows 侧失败语义一致）。
+    use std::sync::OnceLock;
+    static XSS: OnceLock<Option<libloading::Library>> = OnceLock::new();
+    let lib = match XSS
+        .get_or_init(|| libloading::Library::new("libXss.so.1").ok())
+        .as_ref()
+    {
+        Some(l) => l,
+        None => return 0,
+    };
+    type XOpenDisplayFn = unsafe extern "C" fn(name: *const std::os::raw::c_char) -> isize;
+    type XCloseDisplayFn = unsafe extern "C" fn(dpy: isize) -> i32;
+    type XScreenSaverAllocInfoFn = unsafe extern "C" fn() -> isize;
+    type XScreenSaverQueryInfoFn =
+        unsafe extern "C" fn(dpy: isize, drawable: isize, info: isize) -> i32;
+    let open: libloading::Symbol<XOpenDisplayFn> =
+        match unsafe { lib.get(b"XOpenDisplay") } { Ok(f) => f, Err(_) => return 0 };
+    let close: libloading::Symbol<XCloseDisplayFn> =
+        match unsafe { lib.get(b"XCloseDisplay") } { Ok(f) => f, Err(_) => return 0 };
+    let alloc: libloading::Symbol<XScreenSaverAllocInfoFn> =
+        match unsafe { lib.get(b"XScreenSaverAllocInfo") } { Ok(f) => f, Err(_) => return 0 };
+    let query: libloading::Symbol<XScreenSaverQueryInfoFn> =
+        match unsafe { lib.get(b"XScreenSaverQueryInfo") } { Ok(f) => f, Err(_) => return 0 };
+    // SAFETY: XOpenDisplay(NULL) 连接默认 DISPLAY，返回指针或 NULL（isize 0）
+    let dpy = unsafe { open(std::ptr::null()) };
+    if dpy == 0 {
+        return 0;
+    }
+    let result = (|| {
+        // SAFETY: alloc 返回的 info 由 X 库分配，query 填充后读 idle 字段
+        let info = unsafe { alloc() };
+        if info == 0 {
+            return 0i64;
+        }
+        let ok = unsafe { query(dpy, 0, info) };
+        // XScreenSaverInfo 布局（LP64）: window(8) + int state(+pad 8) + idle(8)
+        let idle_ms = if ok != 0 {
+            let idle_ptr = (info as *const u8).wrapping_add(16) as *const u64;
+            unsafe { idle_ptr.read_unaligned() }
+        } else {
+            0
+        };
+        // SAFETY: 释放 X 分配的 info（XFree 签名与 free 类似，接受指针）
+        if let Ok(xfree) = unsafe { lib.get::<unsafe extern "C" fn(isize)>(b"XFree") } {
+            unsafe { xfree(info) };
+        }
+        (idle_ms / 1000) as i64
+    })();
+    unsafe { close(dpy) };
+    result
 }
 
 /// Two short tones. A reminder that only appears visually gets missed while the
@@ -567,8 +618,22 @@ fn play_chime() {
     }
 }
 
+/// Linux（信创）：pcspeaker 不可用，改用 paplay（PulseAudio）播放系统提示音。
+/// 无 paplay 或无声卡时静默跳过——声音是增强项，缺了不能影响提醒本身。
 #[cfg(not(windows))]
-fn play_chime() {}
+fn play_chime() {
+    // 麒麟/UOS 常见的 freedesktop 提示音路径逐一探测
+    const CANDIDATES: &[&str] = &[
+        "/usr/share/sounds/freedesktop/stereo/complete.oga",
+        "/usr/share/sounds/freedesktop/stereo/bell.oga",
+        "/usr/share/sounds/freedesktop/stereo/dialog-information.oga",
+    ];
+    let wav = match CANDIDATES.iter().find(|p| std::path::Path::new(p).exists()) {
+        Some(p) => *p,
+        None => return,
+    };
+    let _ = std::process::Command::new("paplay").arg(wav).spawn();
+}
 
 fn config_path() -> PathBuf {
     // 路径解析统一走 reminder_core::paths（唯一入口），与 legacy 迁移模块共用

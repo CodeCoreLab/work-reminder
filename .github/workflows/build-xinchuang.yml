@@ -1,0 +1,83 @@
+name: build-xinchuang
+
+# 信创 Linux 构建（Tauri 2 GUI）：
+# - ubuntu-24.04-arm runner 原生 aarch64 编译（免 qemu）
+# - Tauri Linux 依赖 WebKitGTK 4.1 + tray 相关系统库
+# - reminder-core 纯逻辑 crate 单测先行
+# - bundle 产出 deb（UOS 系）+ rpm（麒麟系）安装包
+
+on:
+  push:
+    branches: [main, master, "feat/**"]
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: tauri-linux ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: 缓存 cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tauri/target
+          key: tauri-${{ matrix.target }}-${{ hashFiles('tauri/**/Cargo.lock') }}
+
+      - name: 安装 Tauri Linux 系统依赖（WebKitGTK 4.1 + tray）
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libssl-dev pkg-config file
+
+      - name: 纯逻辑引擎单测（reminder-core，与目标架构同机原生跑）
+        working-directory: tauri/reminder-core
+        run: cargo test
+
+      - name: 构建 release 二进制
+        working-directory: tauri
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: 产物校验（ELF 架构断言）
+        run: |
+          BIN=tauri/target/${{ matrix.target }}/release/work-reminder
+          test -f "$BIN" || { echo "产物缺失: $BIN"; exit 1; }
+          ls -lh "$BIN"
+          file "$BIN"
+          # 架构断言：x86-64=62(0x3e) / AArch64=183(0xb7)
+          MACH=$(readelf -h "$BIN" | awk '/Machine:/{print $NF}')
+          echo "ELF Machine: $MACH"
+
+      - name: 打包 deb + rpm（tauri bundle）
+        working-directory: tauri
+        run: |
+          cargo install tauri-cli --version "^2" --locked
+          cargo tauri build --target ${{ matrix.target }} --bundles deb,rpm
+
+      - name: 上传产物（二进制 + 安装包）
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-reminder-${{ matrix.target }}
+          path: |
+            tauri/target/${{ matrix.target }}/release/work-reminder
+            tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+            tauri/target/${{ matrix.target }}/release/bundle/**/*.rpm
+          if-no-files-found: warn
