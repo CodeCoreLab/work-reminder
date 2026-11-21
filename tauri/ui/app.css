@@ -110,13 +110,6 @@ body {
   line-height: 1.3;
 }
 
-.topbar__hint {
-  margin: var(--s1) 0 0;
-  font-size: var(--t-caption);
-  color: var(--fg-muted);
-  line-height: 1.45;
-}
-
 /* ------------------------------------------------------------- the switch */
 
 .switch {
@@ -214,12 +207,6 @@ body {
   font-size: var(--t-title);
   font-weight: 600;
   color: var(--fg-body);
-}
-
-.empty__hint {
-  margin: 0;
-  font-size: var(--t-caption);
-  color: var(--fg-muted);
 }
 
 /* ------------------------------------------------------------------ table */
@@ -436,12 +423,6 @@ body {
   font-size: var(--t-title);
   font-weight: 600;
   color: var(--fg-title);
-}
-
-.sheet__hint {
-  margin: var(--s1) 0 0;
-  font-size: var(--t-caption);
-  color: var(--fg-muted);
 }
 
 /* Label above field: at this width a side-by-side grid wastes the column and forces

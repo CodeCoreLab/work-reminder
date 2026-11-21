@@ -330,13 +330,15 @@ function showToast(fired) {
     card.append(b);
   }
 
-  const foot = document.createElement('div');
-  foot.className = 'toast__foot';
-  const hint = document.createElement('span');
-  hint.className = 'toast__dismiss';
-  hint.textContent = fired.preAlert ? '稍后正式提醒' : '点击任意位置关闭';
-  foot.append(hint);
-  card.append(foot);
+  if (fired.preAlert) {
+    const foot = document.createElement('div');
+    foot.className = 'toast__foot';
+    const hint = document.createElement('span');
+    hint.className = 'toast__dismiss';
+    hint.textContent = '稍后正式提醒';
+    foot.append(hint);
+    card.append(foot);
+  }
 
   // Clicking anywhere dismisses, and the card also fades on its own: a notice that
   // waits for a button press is worse than the event it reports.
